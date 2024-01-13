@@ -6,6 +6,8 @@
 #include <string.h>
 
 #ifdef __cplusplus
+#include <iostream>
+
 extern "C"{
 #endif
 
@@ -31,13 +33,96 @@ extern "C"{
     int teardown_impl(const char* test_case_name)
 
 #undef assert
+#ifdef __cplusplus
 #define assert(expr) do {                           \
-    if (!(expr)) {                                  \
+    if (!(static_cast <bool> (expr))) {             \
         printf("assert failed: " #expr "\n");       \
         printf("file: \"%s\", line %d, in %s\n", __FILE__, __LINE__, __ASSERT_FUNCTION);\
         return 1;                                   \
     }                                               \
 } while (0)
+#define assert_eq(expr1, expr2) do {            \
+    if ((expr1) != (expr2)) {                       \
+        printf("assert failed: " #expr1 " == " #expr2 "\n");    \
+        std::cout << "\t#0: " << (expr1) << std::endl;   \
+        std::cout << "\t#1: " << (expr2) << std::endl;   \
+        printf("file: \"%s\", line %d, in %s\n", __FILE__, __LINE__, __ASSERT_FUNCTION);\
+        return 1;                                   \
+    }                                               \
+} while (0)
+#define assert_ne(expr1, expr2) do {            \
+    if ((expr1) == (expr2)) {                       \
+        printf("assert failed: " #expr1 " != " #expr2 "\n");    \
+        std::cout << "\t#0: " << (expr1) << std::endl;   \
+        std::cout << "\t#1: " << (expr2) << std::endl;   \
+        printf("file: \"%s\", line %d, in %s\n", __FILE__, __LINE__, __ASSERT_FUNCTION);\
+        return 1;                                   \
+    }                                               \
+} while (0)
+#else
+#define assert(expr) do {                           \
+    if (!((bool)(expr))) {                          \
+        printf("assert failed: " #expr "\n");       \
+        printf("file: \"%s\", line %d, in %s\n", __FILE__, __LINE__, __ASSERT_FUNCTION);\
+        return 1;                                   \
+    }                                               \
+} while (0)
+#endif
+#define assert_i32_eq(expr1, expr2) do {            \
+    if ((expr1) != (expr2)) {                       \
+        printf("assert failed: " #expr1 " == " #expr2 "\n");    \
+        printf("\t#0: %d\n", (expr1));              \
+        printf("\t#1: %d\n", (expr2));              \
+        printf("file: \"%s\", line %d, in %s\n", __FILE__, __LINE__, __ASSERT_FUNCTION);\
+        return 1;                                   \
+    }                                               \
+} while (0)
+#define assert_i32_ne(expr1, expr2) do {            \
+    if ((expr1) == (expr2)) {                       \
+        printf("assert failed: " #expr1 " != " #expr2 "\n");    \
+        printf("\t#0: %d\n", (expr1));              \
+        printf("\t#1: %d\n", (expr2));              \
+        printf("file: \"%s\", line %d, in %s\n", __FILE__, __LINE__, __ASSERT_FUNCTION);\
+        return 1;                                   \
+    }                                               \
+} while (0)
+#define assert_i64_eq(expr1, expr2) do {            \
+    if ((expr1) != (expr2)) {                       \
+        printf("assert failed: " #expr1 " == " #expr2 "\n");    \
+        printf("\t#0: %lld\n", (expr1));            \
+        printf("\t#1: %lld\n", (expr2));            \
+        printf("file: \"%s\", line %d, in %s\n", __FILE__, __LINE__, __ASSERT_FUNCTION);\
+        return 1;                                   \
+    }                                               \
+} while (0)
+#define assert_i64_ne(expr1, expr2) do {            \
+    if ((expr1) == (expr2)) {                       \
+        printf("assert failed: " #expr1 " != " #expr2 "\n");    \
+        printf("\t#0: %lld\n", (expr1));            \
+        printf("\t#1: %lld\n", (expr2));            \
+        printf("file: \"%s\", line %d, in %s\n", __FILE__, __LINE__, __ASSERT_FUNCTION);\
+        return 1;                                   \
+    }                                               \
+} while (0)
+#define assert_str_eq(expr1, expr2) do {            \
+    if (strcmp((expr1), (expr2)) != 0) {            \
+        printf("assert failed: " #expr1 " == " #expr2 "\n");    \
+        printf("\t#0: %s\n", (expr1));              \
+        printf("\t#1: %s\n", (expr2));              \
+        printf("file: \"%s\", line %d, in %s\n", __FILE__, __LINE__, __ASSERT_FUNCTION);\
+        return 1;                                   \
+    }                                               \
+} while (0)
+#define assert_str_ne(expr1, expr2) do {            \
+    if (strcmp((expr1), (expr2)) == 0) {            \
+        printf("assert failed: " #expr1 " != " #expr2 "\n");    \
+        printf("\t#0: %s\n", (expr1));              \
+        printf("\t#1: %s\n", (expr2));              \
+        printf("file: \"%s\", line %d, in %s\n", __FILE__, __LINE__, __ASSERT_FUNCTION);\
+        return 1;                                   \
+    }                                               \
+} while (0)
+
 
 typedef int (*test_case)();
 typedef int (*interactive_func)(int argc, const char** argv);

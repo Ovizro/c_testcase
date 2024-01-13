@@ -1,21 +1,27 @@
 #include <iostream>
-#include <vector>
 #include <string>
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 #include <termios.h>
 #include <sstream>
+#include <signal.h>
 #include "c_testcase.h"
 
 using namespace std;
+
+#define TEST_CASE_STATUS_PASSED 0
+#define TEST_CASE_STATUS_SKIPPED 32
+#define TEST_CASE_STATUS_FAILED 16
+#define TEST_CASE_STATUS_SETUP_FAILED 17
+#define TEST_CASE_STATUS_TEARDOWN_FAILED 18
+
+#define MAX_TESTCASE 64
 
 struct TestCase {
     const char* name;
     test_case func;
 };
-
-#define MAX_TESTCASE 64
 
 static TestCase test_cases[MAX_TESTCASE];
 static int test_case_total = 0;
@@ -57,14 +63,14 @@ static __inline int get_tty_col(int fd) {
 }
 
 static __inline void print_separator(char lc) {
-    int size = get_tty_col(STDIN_FILENO);
+    int size = get_tty_col(STDOUT_FILENO);
     for (int i = 0; i < size; ++i) {
         putchar(lc);
     }
 }
 
-void print_separator_ex(char lc, const char* str, const char* color) {
-    int size = get_tty_col(STDIN_FILENO);
+static __inline void print_separator_ex(char lc, const char* str, const char* color) {
+    int size = get_tty_col(STDOUT_FILENO);
     int len = strlen(str);
     printf("\033[0m%s", color); // 设置颜色
     if(len > size) {
@@ -84,15 +90,86 @@ void print_separator_ex(char lc, const char* str, const char* color) {
     printf("\033[0m"); // 重置颜色
 }
 
-int main(int argc, const char** argv) {
-    if (argc > 1 && (strcmp(argv[1], "-i") == 0 || strcmp(argv[1], "--interactive") == 0)) {
-        if (interactive)
-            return interactive(argc, argv);
-        else {
-            cout << "interactive mode is not supported" << endl;
-            return 1;
+static int collect_testcase() {
+    for (int i = 0; i < test_case_total; ++i) {
+        printf(test_cases[i].name);
+        putchar(' ');
+    }
+    putchar('\n');
+    return 0;
+}
+
+static int unittest_testcase(const char* name) {
+    TestCase* tc = NULL;
+    if (*name >= '0' && *name <= '9') {
+        int id = atoi(name);
+        if (id >= 0 && id < test_case_total) {
+            tc = &(test_cases[id]);
+        }
+    } else {
+        for (int i = 0; i < test_case_total; ++i) {
+            if (strcmp(test_cases[i].name, name) == 0) {
+                tc = &(test_cases[i]);
+                break;
+            }
         }
     }
+    if (tc == NULL) {
+        fprintf(stderr, "test case %s not found\n", name);
+        return 1;
+    }
+    if (setup && setup(tc->name)) {
+        return TEST_CASE_STATUS_SETUP_FAILED;
+    }
+    int ret = tc->func();
+    if (teardown && teardown(tc->name)) {
+        return TEST_CASE_STATUS_TEARDOWN_FAILED;
+    }
+
+    if (ret == SKIP_RET_NUMBER) {
+        return TEST_CASE_STATUS_SKIPPED;
+    } else if (ret != 0) {
+        return TEST_CASE_STATUS_FAILED;
+    } else {
+        return 0;
+    }
+}
+
+int main(int argc, const char** argv) {
+    // bool verbose = false;
+    // bool capture_output = true;
+
+    for (int i = 1; i < argc; ++i) {
+        const char* arg = argv[i];
+        if (strcmp(arg, "-i") == 0 || strcmp(arg, "--interactive") == 0) {
+            if (interactive)
+                return interactive(argc, argv);
+            else {
+                cout << "interactive mode is not supported" << endl;
+                return 1;
+            }
+        }
+        else if (strcmp(arg, "-c") == 0 || strcmp(arg, "--collect") == 0) {
+            return collect_testcase();
+        }
+        else if (strcmp(arg, "-u") == 0 || strcmp(arg, "--unittest") == 0) {
+            const char* name = NULL;
+            if (i + 1 < argc) {
+                name = argv[++i];
+            } else {
+                cout << "--unittest require an argument" << endl;
+                return 2;
+            }
+            return unittest_testcase(name);
+        }
+        // else if (strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--verbose") == 0) {
+        //     verbose = true;
+        // }
+        // else if (strcmp(argv[1], "-s") == 0 || strcmp(argv[1], "--no-capture-output") == 0) {
+        //     capture_output = false;
+        // }
+    }
+
     int total = test_case_total;
     int passed = 0;
     int failed = 0;

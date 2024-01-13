@@ -14,8 +14,8 @@ $(BUILD)test_example: test_example.c c_testcase.cpp
 	$(CC) $^ $(CFLAGS) $(LDLIBS) -o $@
 
 .PHONY: test
-test:
-	./unittest.sh
+test: all
+	@python unittest.py
 
 .PHONY: clean
 clean:
