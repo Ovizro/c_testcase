@@ -12,19 +12,42 @@ from traceback import print_exception
 from typing import List, NoReturn, Optional
 
 
-__version__ = "0.1.0"
+__version__ = "0.1.2"
+
+
+if sys.stdout.isatty():
+    TTY_COLOR_RED = "\033[31m"
+    TTY_COLOR_RED_BOLD = "\033[1;31m"
+    TTY_COLOR_GREEN = "\033[32m"
+    TTY_COLOR_GREEN_BOLD = "\033[1;32m"
+    TTY_COLOR_YELLOW = "\033[33m"
+    TTY_COLOR_YELLOW_BOLD = "\033[1;33m"
+    TTY_COLOR_CYAN_BOLD = "\033[1;36m"
+    TTY_COLOR_CLEAR = "\033[0m"
+
+    TTY_COLUMNS_SIZE = os.get_terminal_size().columns
+else:
+    TTY_COLOR_RED = ""
+    TTY_COLOR_RED_BOLD = ""
+    TTY_COLOR_GREEN = ""
+    TTY_COLOR_GREEN_BOLD = ""
+    TTY_COLOR_YELLOW = ""
+    TTY_COLOR_YELLOW_BOLD = ""
+    TTY_COLOR_CYAN_BOLD = ""
+    TTY_COLOR_CLEAR = ""
+
+    TTY_COLUMNS_SIZE = 80
 
 
 def print_separator_ex(lc: str, title: str, color: str) -> None:
-    size = os.get_terminal_size().columns
     len_str = len(title)
     
-    print(f"\033[0m{color}", end='')  # 设置颜色样式
-    if len_str + 2 > size:
+    print(f"{TTY_COLOR_CLEAR}{color}", end='')  # 设置颜色样式
+    if len_str + 2 > TTY_COLUMNS_SIZE:
         print(title)
     else:
-        print(f" {title} ".center(size, lc))
-    print("\033[0m", end='')  # 重置颜色为默认
+        print(f" {title} ".center(TTY_COLUMNS_SIZE, lc))
+    print(TTY_COLOR_CLEAR, end='')  # 重置颜色为默认
 
 
 class CTestCaseStatus(IntEnum):
@@ -39,13 +62,13 @@ class CTestCaseStatus(IntEnum):
 
 class CTestCaseCounter:
     __slots__ = ["total_count", "passed", "error", "failed", "skipped"]
-
+    
     def __init__(self) -> None:
         self.total_count = 0
-        self.passed = set()
-        self.error = set()
-        self.failed = set()
-        self.skipped = set()
+        self.passed: 'set[CTestCase]' = set()
+        self.error: 'set[CTestCase]' = set()
+        self.failed: 'set[CTestCase]' = set()
+        self.skipped: 'set[CTestCase]' = set()
     
     def update(self, test_case: "CTestCase") -> None:
         self.total_count += 1
@@ -132,9 +155,12 @@ class CTestCase:
             self.status = CTestCaseStatus.ERROR
             self.error_info = sys.exc_info()
             if not capture:
-                print("\033[31m")
+                print(TTY_COLOR_RED)
                 print_exception(*self.error_info)
-                print("\033[0m")
+                print(TTY_COLOR_CLEAR)
+        except KeyboardInterrupt:
+            self.status = CTestCaseStatus.ERROR
+            self.error_info = sys.exc_info()
         else:
             code = self.result.returncode
             if code in CTestCaseStatus.__members__.values():
@@ -149,29 +175,29 @@ class CTestCase:
 
     def print_status(self) -> None:
         if self.status == CTestCaseStatus.PASSED:
-            print("\033[32m.\033[0m", end='')
+            print(f"{TTY_COLOR_GREEN}.{TTY_COLOR_CLEAR}", end='')
         elif self.status in [CTestCaseStatus.FAILED, CTestCaseStatus.SETUP_FAILED, CTestCaseStatus.TEARDOWN_FAILED]:
-            print("\033[31mF\033[0m", end='')
+            print(f"{TTY_COLOR_RED}F{TTY_COLOR_CLEAR}", end='')
         elif self.status == CTestCaseStatus.ERROR:
-            print("\033[31mE\033[0m", end='')
+            print(f"{TTY_COLOR_RED}E{TTY_COLOR_CLEAR}", end='')
         elif self.status == CTestCaseStatus.SKIPPED:
-            print("\033[33ms\033[0m", end='')
+            print(f"{TTY_COLOR_YELLOW}s{TTY_COLOR_CLEAR}", end='')
         else:
             raise ValueError(f"invalid test case status: {self.status}")
     
     def print_status_verbose(self) -> None:
         if self.status == CTestCaseStatus.PASSED:
-            print(f"{self.name} \033[32mPASSED\033[0m")
+            print(f"{self.name} {TTY_COLOR_GREEN}PASSED{TTY_COLOR_CLEAR}")
         elif self.status == CTestCaseStatus.FAILED:
-            print(f"{self.name} \033[31mFAILED\033[0m")
+            print(f"{self.name} {TTY_COLOR_RED}FAILED{TTY_COLOR_CLEAR}")
         elif self.status == CTestCaseStatus.ERROR:
-            print(f"{self.name} \033[31mERROR\033[0m")
+            print(f"{self.name} {TTY_COLOR_RED}ERROR{TTY_COLOR_CLEAR}")
         elif self.status == CTestCaseStatus.SETUP_FAILED:
-            print(f"{self.name} \033[31mSETUP FAILED\033[0m")
+            print(f"{self.name} {TTY_COLOR_RED}SETUP FAILED{TTY_COLOR_CLEAR}")
         elif self.status == CTestCaseStatus.TEARDOWN_FAILED:
-            print(f"{self.name} \033[31mTEARDOWN FAILED\033[0m")
+            print(f"{self.name} {TTY_COLOR_RED}TEARDOWN FAILED{TTY_COLOR_CLEAR}")
         elif self.status == CTestCaseStatus.SKIPPED:
-            print(f"{self.name} \033[33mSKIPPED\033[0m")
+            print(f"{self.name} {TTY_COLOR_YELLOW}SKIPPED{TTY_COLOR_CLEAR}")
         else:
             raise ValueError(f"invalid test case status: {self.status}")
     
@@ -179,41 +205,49 @@ class CTestCase:
         if self.status == CTestCaseStatus.PASSED:
             return
         elif self.status == CTestCaseStatus.SKIPPED:
-            return f"\033[33mSKIPPED\033[0m {self.name}"
+            return f"{TTY_COLOR_YELLOW}SKIPPED{TTY_COLOR_CLEAR} {self.name}"
         elif self.status == CTestCaseStatus.ERROR:
             if self.error_info:
-                print_separator_ex('_', self.name, "\033[31m")
-                print("\033[31m", end='')
+                print_separator_ex('_', self.name, TTY_COLOR_RED)
+                print(TTY_COLOR_RED, end='')
                 print_exception(*self.error_info)
-                print("\033[0m", end='')
-                return f"\033[33mERROR\033[0m {self.name} - {self.error_info[0].__name__}: {self.error_info[1]}"
+                print(TTY_COLOR_CLEAR, end='')
+                assert self.error_info[0]
+                if str(self.error_info[1]):
+                    error = f"{self.error_info[0].__name__}: {self.error_info[1]}"
+                else:
+                    error = f"{self.error_info[0].__name__}"
+                return f"{TTY_COLOR_RED}ERROR{TTY_COLOR_CLEAR} {self.name} - {error}"
             else:
                 assert self.result
-                if self.result.stderr is not None:
-                    print_separator_ex('_', self.name, "\033[31m")
-                    print("\033[31m", end='')
+                if self.result.stderr:
+                    print_separator_ex('_', self.name, TTY_COLOR_RED)
+                    print(TTY_COLOR_RED, end='')
                     print(self.result.stderr.decode("utf-8"), end='')
-                    print("\033[0m", end='')
-                if self.result.stdout is not None:
+                    print(TTY_COLOR_CLEAR, end='')
+                if self.result.stdout:
                     print_separator_ex('-', "Captured stdout", '')
                     print(self.result.stdout.decode("utf-8"), end='')
-                return f"\033[33mERROR\033[0m {self.name} - RuntimeError ({self.result.returncode})"
+                return f"{TTY_COLOR_RED}ERROR{TTY_COLOR_CLEAR} {self.name} - RuntimeError ({self.result.returncode})"
         elif self.status in [CTestCaseStatus.FAILED, CTestCaseStatus.SETUP_FAILED, CTestCaseStatus.TEARDOWN_FAILED]:
             assert self.result
-            if self.result.stderr is not None:
-                print_separator_ex('_', self.name, "\033[31m")
-                print("\033[31m", end='')
+            if self.result.stderr:
+                print_separator_ex('_', self.name, TTY_COLOR_RED)
+                print(TTY_COLOR_RED, end='')
                 print(self.result.stderr.decode("utf-8"), end='')
-                print("\033[0m", end='')
-            if self.result.stdout is not None:
-                print_separator_ex('-', "Captured stdout", '')
-                print(self.result.stdout.decode("utf-8"), end='')
+                print(TTY_COLOR_CLEAR, end='')
+            if self.result.stdout:
+                if self.result.stderr:
+                    print_separator_ex('-', "Captured stdout", '')
+                else:
+                    print_separator_ex('_', self.name, '')
+                print(self.result.stdout.decode("utf-8", "replace"), end='')
             if self.status == CTestCaseStatus.FAILED:
-                return f"\033[31mFAILED\033[0m {self.name}"
+                return f"{TTY_COLOR_RED}FAILED{TTY_COLOR_CLEAR} {self.name}"
             elif self.status == CTestCaseStatus.SETUP_FAILED:
-                return f"\033[31mFAILED\033[0m {self.name} - SetupError"
+                return f"{TTY_COLOR_RED}FAILED{TTY_COLOR_CLEAR} {self.name} - SetupError"
             else:
-                return f"\033[31mFAILED\033[0m {self.name} - TeardownError"
+                return f"{TTY_COLOR_RED}FAILED{TTY_COLOR_CLEAR} {self.name} - TeardownError"
         else:
             raise ValueError(f"invalid test case status: {self.status}")
 
@@ -256,20 +290,21 @@ class CTestCaseFile:
     
     def report(self) -> List[str]:
         if self.collect_result is not None:
-            print_separator_ex('_', f"ERROR collecting {self.path}", "\033[1;31m")
-            print("\033[31m", end='')
+            print_separator_ex('_', f"ERROR collecting {self.path}", TTY_COLOR_RED_BOLD)
+            print(TTY_COLOR_RED, end='')
             print(self.collect_result.stderr.decode())
-            print("\033[0m", end='')
+            print(TTY_COLOR_CLEAR, end='')
             if self.collect_result.stdout:
                 print_separator_ex('-', "Captured stdout", '')
                 print(self.collect_result.stdout.decode())
             return [f"ERROR {self.path} - CollectError ({self.collect_result.returncode})"]
         elif self.collect_error_info is not None:
-            print_separator_ex('_', f"ERROR collecting {self.path}", "\033[1;31m")
-            print("\033[31m", end='')
+            assert self.collect_error_info[0]
+            print_separator_ex('_', f"ERROR collecting {self.path}", TTY_COLOR_RED_BOLD)
+            print(TTY_COLOR_RED, end='')
             print_exception(*self.collect_error_info)
-            print("\033[0m", end='')
-            return [f"\033[31mERROR\033[0m {self.path} - {self.collect_error_info[0].__name__}: {self.collect_error_info[1]}"]
+            print(TTY_COLOR_CLEAR, end='')
+            return [f"ERROR{TTY_COLOR_CLEAR} {self.path} - {self.collect_error_info[0].__name__}: {self.collect_error_info[1]}"]
         return list(filter(None, (i.report() for i in self.test_cases)))
     
     @property
@@ -283,18 +318,18 @@ def report_collect_error(start_time: float, *error_files: CTestCaseFile) -> NoRe
     for i in error_files:
         summary.extend(i.report())
 
-    print_separator_ex('=', "short test summary info", '\033[1;36m')
+    print_separator_ex('=', "short test summary info", TTY_COLOR_CYAN_BOLD)
     for i in summary:
         print(i)
     print_separator_ex('!', f"Interrupted: {len(error_files)} error during collection", '')
     cur_time = time()
-    print_separator_ex('=', f"{len(summary)} error in {cur_time - start_time:.2f}s", "\033[1;31m")
+    print_separator_ex('=', f"{len(summary)} error in {cur_time - start_time:.2f}s", TTY_COLOR_RED_BOLD)
     sys.exit(1)
 
 
 def report_no_ran(start_time: float) -> NoReturn:
     cur_time = time()
-    print_separator_ex('=', f"no tests ran in {cur_time - start_time:.2f}s", "\033[33m")
+    print_separator_ex('=', f"no tests ran in {cur_time - start_time:.2f}s", TTY_COLOR_YELLOW)
     sys.exit()
 
 def report(start_time: float, counter: CTestCaseCounter, *, show_capture: bool = True) -> NoReturn:
@@ -305,26 +340,26 @@ def report(start_time: float, counter: CTestCaseCounter, *, show_capture: bool =
             print_separator_ex('=', "ERRORS", '')
         for i in counter.error:
             summary.append(i.report())
-    elif counter.failed:
+    if counter.failed:
         if show_capture:
-            print_separator_ex('=', "FAILURES", "\033[31m")
+            print_separator_ex('=', "FAILURES", TTY_COLOR_RED)
         for i in counter.failed:
             summary.append(i.report())
-    elif counter.skipped:
+    if counter.skipped:
         for i in counter.skipped:
             summary.append(i.report())
     
     if summary:
-        print_separator_ex('=', "short test summary info", '\033[1;36m')
+        print_separator_ex('=', "short test summary info", TTY_COLOR_CYAN_BOLD)
         for i in summary:
             print(i)
     
     if counter.status in [CTestCaseStatus.FAILED, CTestCaseStatus.ERROR]:
-        color = "\033[31m"
+        color = TTY_COLOR_RED_BOLD
     elif counter.status == CTestCaseStatus.SKIPPED:
-        color = "\033[33m"
+        color = TTY_COLOR_YELLOW_BOLD
     else:
-        color = "\033[32m"
+        color = TTY_COLOR_GREEN_BOLD
     
     print_separator_ex('=', f"{counter} in {cur_time - start_time:.2f}s", color)
     if counter.status in [CTestCaseStatus.FAILED, CTestCaseStatus.ERROR]:
@@ -334,7 +369,7 @@ def report(start_time: float, counter: CTestCaseCounter, *, show_capture: bool =
 
 if __name__ == "__main__":
     parser = ArgumentParser("unittest", description="Run unit tests")
-    parser.add_argument("path", nargs='?', help="path to the test directory or file", default="./bin/test_*")
+    parser.add_argument("path", nargs='+', help="path to the test directory or file", default="./test_*")
     parser.add_argument("-V", "--version", action="version", version=__version__)
     parser.add_argument("-v", "--verbose", action="store_true", help="verbose output")
     parser.add_argument("-s", "--no-capture", action="store_false", help="capture stdout and stderr")
@@ -349,8 +384,15 @@ if __name__ == "__main__":
     total = 0
     error_files = []
     start_time = time()
-    for i in glob(namespace.path):
-        f = CTestCaseFile(i)
+
+    paths = []
+    for p in namespace.path:
+        if '*' in p:
+            paths.extend(glob(p, recursive=True))
+        elif os.path.isfile(p):
+            paths.append(p)
+    for p in paths:
+        f = CTestCaseFile(p)
         total += f.collect()
         if f.error:
             error_files.append(f)
